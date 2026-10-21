@@ -1,5 +1,5 @@
 
-# Build the exact llama.cpp version tested on A40
+# Build tested llama.cpp version for A40
 FROM nvidia/cuda:12.8.1-devel-ubuntu24.04 AS builder
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -9,6 +9,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /opt
 
+# CUDA stub for Docker builds without a GPU driver
+RUN ln -sf /usr/local/cuda/lib64/stubs/libcuda.so \
+    /usr/local/cuda/lib64/stubs/libcuda.so.1
+
 RUN git clone https://github.com/ggml-org/llama.cpp.git \
     && cd llama.cpp \
     && git checkout 0a1ef309c \
@@ -17,7 +21,10 @@ RUN git clone https://github.com/ggml-org/llama.cpp.git \
        -DGGML_CUDA=ON \
        -DCMAKE_CUDA_ARCHITECTURES=86 \
        -DLLAMA_CURL=ON \
+       -DCMAKE_EXE_LINKER_FLAGS="-Wl,-rpath-link,/usr/local/cuda/lib64/stubs -L/usr/local/cuda/lib64/stubs -lcuda" \
+       -DCMAKE_SHARED_LINKER_FLAGS="-L/usr/local/cuda/lib64/stubs -lcuda" \
     && cmake --build build --parallel 8 --target llama-server
+
 
 # RunPod Serverless runtime
 FROM nvidia/cuda:12.8.1-runtime-ubuntu24.04

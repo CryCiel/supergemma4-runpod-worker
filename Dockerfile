@@ -1,5 +1,6 @@
 
-# Build tested llama.cpp version for A40
+# Build pinned llama.cpp for A40 (SM 86), Ada (SM 89), and
+# RTX PRO 6000 Blackwell / MIG 48GB (SM 120a). CUDA 12.8+ required.
 FROM nvidia/cuda:12.8.1-devel-ubuntu24.04 AS builder
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -19,7 +20,7 @@ RUN git clone https://github.com/ggml-org/llama.cpp.git \
     && cmake -S . -B build -G Ninja \
        -DCMAKE_BUILD_TYPE=Release \
        -DGGML_CUDA=ON \
-       -DCMAKE_CUDA_ARCHITECTURES=86 \
+       -DCMAKE_CUDA_ARCHITECTURES="86-real;89-real;120a-real" \
        -DLLAMA_CURL=ON \
        -DCMAKE_EXE_LINKER_FLAGS="-Wl,-rpath-link,/usr/local/cuda/lib64/stubs -L/usr/local/cuda/lib64/stubs -lcuda" \
        -DCMAKE_SHARED_LINKER_FLAGS="-L/usr/local/cuda/lib64/stubs -lcuda" \

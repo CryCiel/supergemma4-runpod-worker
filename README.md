@@ -58,3 +58,38 @@ For RunPod flat jobs (`input.messages` or `input.prompt`), common generation set
 ```
 
 Increasing the `max_tokens` ceiling does **not** automatically make responses longer. Check the completion finish reason (`length` versus `stop`) before increasing it. For large models, set `LLAMA_STARTUP_TIMEOUT` to more than 300 only if startup actually times out.
+
+## GPU build targets (including Blackwell MIG)
+
+The CUDA image builds native kernels for these GPUs, using the pinned llama.cpp
+commit and CUDA 12.8.1 toolchain:
+
+| CUDA target | Typical GPU | Notes |
+| --- | --- | --- |
+| `86-real` | A40 48GB | Existing working configuration |
+| `89-real` | L40/L40S, RTX 6000 Ada | Ada 48GB GPUs |
+| `120a-real` | RTX PRO 6000 Blackwell MIG 48GB | Blackwell server 2g.48gb MIG slice |
+
+The `-real` targets avoid including redundant PTX targets in the image.
+Building for three targets increases build-time compilation work versus an
+A40-only build, but does not change the model, prompts, or inference API.
+
+**RunPod GPU selection** is configured separately in the Serverless endpoint
+settings. Changing a Hub template `gpuIds` does not reconfigure an already
+deployed endpoint. `ADA_48_PRO` is an Ada pool, *not* a Blackwell MIG pool;
+do not select it expecting a Blackwell MIG GPU. Keep the exact GPU/pool already
+chosen in the endpoint if it is working.
+
+**Context capacity:** `--ctx-size 262144` is a `llama-server` runtime
+setting, not a Docker build setting. A Blackwell MIG 48GB slice has 48GB VRAM,
+not the parent card's 96GB. Confirm model+KV cache fit, startup health, and
+long-context generation in RunPod logs before treating 260K as verified.
+
+When deploying, check for:
+1. A successful Docker build and image push.
+2. `llama-server is READY.` in worker logs, with the expected GPU detected.
+3. A short SillyTavern response, followed by a long-context test.
+4. No CUDA architecture or out-of-memory errors.
+
+If this build fails, inspect the RunPod Build logs for the first CMake/NVCC
+error; the earlier A40-only Dockerfile remains available in Git history.

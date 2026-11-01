@@ -24,10 +24,15 @@ trap 'exit 143' SIGTERM
 trap 'exit 130' SIGINT
 
 # Require explicit configuration
-: "${LLAMA_CACHED_MODEL:?Missing LLAMA_CACHED_MODEL}"
-: "${LLAMA_CACHED_GGUF_PATH:?Missing LLAMA_CACHED_GGUF_PATH}"
 : "${LLAMA_SERVER_CMD_ARGS:?Missing LLAMA_SERVER_CMD_ARGS}"
 
+# Cached models are optional; direct -hf/-m settings also work.
+MODEL_ARGS=()
+if [[ -n "${LLAMA_CACHED_MODEL:-}" || -n "${LLAMA_CACHED_GGUF_PATH:-}" ]]; then
+    if [[ -z "${LLAMA_CACHED_MODEL:-}" || -z "${LLAMA_CACHED_GGUF_PATH:-}" ]]; then
+        echo "ERROR: Set BOTH LLAMA_CACHED_MODEL and LLAMA_CACHED_GGUF_PATH."
+        exit 1
+    fi
 # Resolve the cached GGUF file
 MODEL_PATH="$(python - <<'PY'
 import os
@@ -64,17 +69,44 @@ PY
 )"
 
 echo "Found model: $MODEL_PATH"
+    MODEL_ARGS=(-m "$MODEL_PATH")
+else
+    echo "Using model selection from LLAMA_SERVER_CMD_ARGS."
+fi
 
 # Parse the configured command arguments
 read -r -a SERVER_ARGS <<< "$LLAMA_SERVER_CMD_ARGS"
 
 # Port is managed internally
 for arg in "${SERVER_ARGS[@]}"; do
-    if [[ "$arg" == "--port" || "$arg" == "--host" ]]; then
-        echo "ERROR: Do not set --port or --host manually."
-        exit 1
+    case "$arg" in
+        --port|--port=*|-p|--host|--host=*)
+            echo "ERROR: Do not set --port or --host manually."
+            exit 1
+            ;;
+    esac
+    if (( ${#MODEL_ARGS[@]} > 0 )); then
+        case "$arg" in
+            -m|--model|--model=*|-hf|--hf-repo|--hf-repo=*)
+                echo "ERROR: Do not set a model flag with LLAMA_CACHED_MODEL."
+                exit 1
+                ;;
+        esac
     fi
 done
+
+if (( ${#MODEL_ARGS[@]} == 0 )); then
+    HAS_MODEL=false
+    for arg in "${SERVER_ARGS[@]}"; do
+        case "$arg" in
+            -m|--model|--model=*|-hf|--hf-repo|--hf-repo=*) HAS_MODEL=true ;;
+        esac
+    done
+    if [[ "$HAS_MODEL" != true ]]; then
+        echo "ERROR: Set cache variables or specify -hf/-m in LLAMA_SERVER_CMD_ARGS."
+        exit 1
+    fi
+fi
 
 echo "Launching llama-server..."
 
@@ -86,7 +118,7 @@ TAIL_PID=$!
 
 LD_LIBRARY_PATH=/app \
 /app/llama-server \
-    -m "$MODEL_PATH" \
+    "${MODEL_ARGS[@]}" \
     "${SERVER_ARGS[@]}" \
     --host 127.0.0.1 \
     --port 3098 \
@@ -98,7 +130,11 @@ echo "llama-server PID: $SERVER_PID"
 echo "Waiting for model initialization..."
 
 # Allow up to 180 seconds for model startup
-MAX_START_SECONDS=180
+MAX_START_SECONDS="${LLAMA_STARTUP_TIMEOUT:-300}"
+if ! [[ "$MAX_START_SECONDS" =~ ^[1-9][0-9]*$ ]]; then
+    echo "ERROR: LLAMA_STARTUP_TIMEOUT must be a positive integer (seconds)."
+    exit 1
+fi
 
 for ((i=1; i<=MAX_START_SECONDS; i++)); do
 

@@ -23,10 +23,10 @@ Typical usage:
 import json
 
 from dotenv import load_dotenv
-from openai import OpenAI
+from openai import AsyncOpenAI
 from utils import JobInput
 
-client = OpenAI(
+client = AsyncOpenAI(
     base_url="http://localhost:3098/v1/",
     api_key="none",
 )
@@ -98,7 +98,7 @@ class LlamaCPPEngine:
         openAIEngine = LlamaCPPOpenAIEngine()
 
         # Get model to use (defaults to first model in list of models)
-        model = client.models.list().data[0].id
+        model = (await client.models.list()).data[0].id
 
         # Depending if prompt is a string or a list, we need to handle it
         # differently and send it to the OpenAI API
@@ -111,6 +111,7 @@ class LlamaCPPEngine:
                         "model": model,
                         "prompt": job_input.llm_input,
                         "stream": job_input.stream,
+                        **job_input.generation_options,
                     },
                 }
             )
@@ -123,12 +124,12 @@ class LlamaCPPEngine:
                         "model": model,
                         "messages": job_input.llm_input,
                         "stream": job_input.stream,
+                        **job_input.generation_options,
                     },
                 }
             )
 
-        print("Generating response for job_input:", job_input)
-        print("OpenAI job:", openAIjob)
+        print(f"Dispatching {openAIjob.openai_route} (stream={job_input.stream})")
 
         # Create a generator that will yield the response from the OpenAI API
         generate = openAIEngine.generate(openAIjob)
@@ -224,7 +225,7 @@ class LlamaCPPOpenAIEngine(LlamaCPPEngine):
         """
 
         try:
-            response = client.models.list()
+            response = await client.models.list()
 
             yield {
                 "object": "list",
@@ -273,16 +274,16 @@ class LlamaCPPOpenAIEngine(LlamaCPPEngine):
             # Call openai.chat.completions.create or openai.completions.create
             # based on the route
             if chat:
-                response = client.chat.completions.create(**openai_input)
+                response = await client.chat.completions.create(**openai_input)
             else:
-                response = client.completions.create(**openai_input)
+                response = await client.completions.create(**openai_input)
 
             # If streaming is False, we can just return the response
             if not openai_input.get("stream", False):
                 yield response.to_dict()
                 return
 
-            for chunk in response:
+            async for chunk in response:
                 # Return json of the chunk without any line breaks
                 yield "data: " + json.dumps(
                     chunk.to_dict(), separators=(",", ":")

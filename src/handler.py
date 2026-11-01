@@ -12,7 +12,7 @@ from utils import JobInput
 from engine import LlamaCPPEngine, LlamaCPPOpenAIEngine
 
 # set max concurrency from environment variable or default
-DEFAULT_MAX_CONCURRENCY = 8
+DEFAULT_MAX_CONCURRENCY = 1
 
 max_concurrency = int(os.getenv("MAX_CONCURRENCY", DEFAULT_MAX_CONCURRENCY))
 

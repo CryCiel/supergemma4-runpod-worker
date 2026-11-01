@@ -25,3 +25,14 @@ class JobInput:
         self.stream = job.get("stream", False)
         self.openai_route = job.get("openai_route")
         self.openai_input = job.get("openai_input")
+        # Forward supported generation settings for flat prompt/messages jobs.
+        # Explicit openai_route/openai_input jobs are passed through unchanged.
+        options = (
+            "max_tokens", "temperature", "top_p", "presence_penalty",
+            "frequency_penalty", "stop", "seed", "n", "logit_bias",
+        )
+        self.generation_options = {
+            key: job[key]
+            for key in options
+            if key in job and job[key] is not None
+        }

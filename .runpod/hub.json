@@ -7,7 +7,7 @@
     "config": {
         "runsOn": "GPU",
         "gpuCount": 1,
-        "gpuIds": "AMPERE_16,AMPERE_24,ADA_24",
+        "gpuIds": "AMPERE_16,AMPERE_24,AMPERE_48,ADA_24",
         "containerDiskInGb": 32,
         "presets": [],
         "env": [
@@ -17,7 +17,7 @@
                     "name": "Command line arguments for llama-server",
                     "type": "string",
                     "description": "Launch command line arguments (argv) for the llama-server binary. Do not define the port. If using caching, do not define -hf or -m here.",
-                    "default": "-hf unsloth/gemma-3-270m-it-GGUF:Q6_K --ctx-size 4096 -ngl 999",
+                    "default": "-hf unsloth/gemma-3-270m-it-GGUF:Q6_K --ctx-size 4096 -ngl 999 --parallel 1",
                     "advanced": false
                 }
             },
@@ -46,8 +46,8 @@
                 "input": {
                     "name": "Maximum Concurrency",
                     "type": "number",
-                    "description": "Maximum number of concurrent requests to handle (default: 8).",
-                    "default": 8,
+                    "description": "Maximum concurrent requests (default: 1 for single-user long-context generation).",
+                    "default": 1,
                     "advanced": true
                 }
             }

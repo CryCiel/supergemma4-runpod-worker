@@ -20,6 +20,7 @@ RUN git clone https://github.com/ggml-org/llama.cpp.git \
     && cmake -S . -B build -G Ninja \
        -DCMAKE_BUILD_TYPE=Release \
        -DGGML_CUDA=ON \
+       -DGGML_NATIVE=OFF \
        -DCMAKE_CUDA_ARCHITECTURES="86-real;89-real;120a-real" \
        -DLLAMA_CURL=ON \
        -DCMAKE_EXE_LINKER_FLAGS="-Wl,-rpath-link,/usr/local/cuda/lib64/stubs -L/usr/local/cuda/lib64/stubs -lcuda" \
